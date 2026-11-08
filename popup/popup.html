@@ -47,8 +47,13 @@
 
   <div id="lookup-none" hidden>
     <h2 id="none-host"></h2>
-    <p class="muted">This company isn't in the starter directory yet. The directory only lists official
-    sources verified by hand — it never guesses a brand page.</p>
+    <p class="muted">This site isn't in the hand-verified starter directory yet.</p>
+    <button id="btn-scan" class="primary">Scan this site for official brand pages</button>
+    <p class="fineprint">One scan, only when you click: checks page links and about 16 common
+    official paths on this site (around 20 requests to the site itself). It reports what actually
+    answered - it never guesses or invents a brand page.</p>
+    <div id="scan-status" class="muted" hidden></div>
+    <div id="scan-results" hidden></div>
     <details id="detected-box-2">
       <summary>Detected on this page <span class="caveat">not verified as officially published</span></summary>
       <div id="detected-list-2" class="assets"></div>
@@ -82,6 +87,10 @@
     <h3>Logo directions <span class="caveat">original starting points</span></h3>
     <div id="mark-list" class="cards marks"></div>
 
+    <div class="refresh-row">
+      <button id="btn-refresh" class="ghost">Try more options</button>
+      <span class="fineprint">Same brief, new variations. Anything pinned with Keep stays.</span>
+    </div>
     <button id="btn-kit" class="primary" disabled>Download brand-guidelines PDF</button>
     <p class="fineprint">Pick one colour direction and one logo direction first.</p>
     <button id="btn-rebrief" class="ghost">Edit my brief</button>
@@ -89,7 +98,7 @@
 </section>
 
 <footer class="foot">
-  <span>Official sources verified Nov 2026</span>
+  <span>Official sources verified Nov 2026 · v0.2.0</span>
   <span>No account · lookup lists and kit generation run on your device · downloading official assets opens the company's own link</span>
 </footer>
 
