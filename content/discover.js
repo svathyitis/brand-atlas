@@ -40,6 +40,28 @@
   function sameOrigin(u) {
     try { return new URL(u).origin === ORIGIN; } catch (e) { return false; }
   }
+  // Multi-tenant / user-content hosts: on these, a bare path usually belongs
+  // to a user or community space, NOT to the company. A page found there is
+  // only official when it sits under that host's own organizational routes;
+  // anything else is reported separately as unverified, never as official.
+  var UGC_HOSTS = {
+    "github.com": [/^\/about(\/|$)/, /^\/org(\/|$)/, /^\/topics(\/|$)/],
+    "gitlab.com": [/^\/about(\/|$)/],
+    "bitbucket.org": [/^\/product(\/|$)/, /^\/company(\/|$)/],
+    "medium.com": [/^\/about(\/|$)/],
+    "linkedin.com": [/^\/company(\/|$)/],
+    "notion.site": [],
+    "tumblr.com": []
+  };
+  function ugcRouteKind(u) {
+    var h = hostOf(u).replace(/^www\./, "");
+    var rules = UGC_HOSTS[h];
+    if (!rules) return null;              // not a known UGC host
+    var p = pathOf(u);
+    for (var i = 0; i < rules.length; i++) if (rules[i].test(p === "/" ? p : p + "/")) return "official";
+    return "user";                        // everything else: user/community space
+  }
+
   // Rough registrable-domain match (last two labels). Good enough to spot a
   // company's own subdomains (brand.example.com) without a public-suffix list.
   function rootDomain(h) {
@@ -112,7 +134,7 @@
       if (pathOf(finalUrl) !== pathOf(u) && !PAGE_RE.test(pathOf(finalUrl))) return null;
       var html = await r.text();
       if (html.length > MAX_HTML) html = html.slice(0, MAX_HTML);
-      return { url: finalUrl, requested: u, via: via, html: html, htmlLen: html.length, redirected: pathOf(finalUrl) !== pathOf(u) };
+      return { url: finalUrl, requested: u, via: via, html: html, htmlLen: html.length, redirected: pathOf(finalUrl) !== pathOf(u), route: ugcRouteKind(finalUrl) };
     } catch (e) {
       return null;   // network/CORS refusal - just means this scan can't read it
     }
@@ -212,6 +234,13 @@
   }
 
   // ---------- Phase 4: analyse ----------
+  var pagesRoute = {};
+  for (var pr = 0; pr < pages.length; pr++) {
+    if (pages[pr].route) {
+      pagesRoute[strip(pages[pr].requested)] = pages[pr].route;
+      pagesRoute[strip(pages[pr].url)] = pages[pr].route;
+    }
+  }
   var analysed = [];
   var seenPage = {};
   for (var q = 0; q < pages.length; q++) {
@@ -235,6 +264,7 @@
     shellSig[sig] = (shellSig[sig] || 0) + 1;
   }
   var results = [];
+  var unverified = [];
   var shellPaths = [];
   for (var t = 0; t < analysed.length; t++) {
     var pg2 = analysed[t];
@@ -243,7 +273,9 @@
       shellPaths.push(pg2.via.slice(5));
       continue;
     }
+    var route = pagesRoute[strip(pg2.requested)] || pagesRoute[strip(pg2.url)] || null;
     delete pg2.htmlLen;
+    if (route === "user") { unverified.push(pg2); continue; }
     results.push(pg2);
   }
 
@@ -265,6 +297,7 @@
     host: location.hostname,
     pageUrl: location.href,
     pages: results,
+    unverifiedPages: unverified,
     shellPaths: shellPaths,
     offsiteLinks: offsiteMerged.slice(0, 6),
     checkedPaths: PROBE_PATHS.slice(0, Math.max(stats.pathsProbed, 0)),
