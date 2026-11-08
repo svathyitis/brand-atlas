@@ -282,6 +282,16 @@
         }
       }
     }
+    var scopeNoteId = "mark-scope-note";
+    var oldNote = document.getElementById(scopeNoteId);
+    if (oldNote) oldNote.remove();
+    if (state.keptMark && !state.keptPalette) {
+      var scope = document.createElement("p");
+      scope.id = scopeNoteId;
+      scope.className = "fineprint";
+      scope.textContent = "Your kept logo keeps its shape; its colours follow whichever colour direction is selected.";
+      list.parentNode.insertBefore(scope, list);
+    }
     var stillThere = false;
     state.marks.forEach(function (mk) {
       var kept = state.keptMark && mk.id === state.keptMark.id;
@@ -353,7 +363,8 @@
     state.variant++;
     var res = BrandGen.makePalettes(name, desc, state.variant);
     state.palettes = res.palettes;
-    state.chosenPalette = state.keptPalette || null;
+    // A kept logo must survive refresh: keep its palette as the colour base when no palette is pinned.
+    state.chosenPalette = state.keptPalette || (state.keptMark ? state.chosenPalette : null);
     if (!state.keptMark) state.chosenMark = null;
     renderPalettes();
     // reselect the kept palette card if there is one, else clear marks
@@ -417,6 +428,32 @@
         return;
       }
       box.appendChild(none);
+    }
+
+    if (res.unverifiedPages && res.unverifiedPages.length) {
+      var uh = document.createElement("p");
+      uh.className = "scan-note";
+      uh.textContent = "Unverified - these addresses answered but belong to user or community spaces on this site, not to the company's own newsroom:";
+      box.appendChild(uh);
+      res.unverifiedPages.forEach(function (pg) {
+        var row = document.createElement("div");
+        row.className = "asset";
+        var left = document.createElement("div");
+        var label = document.createElement("div");
+        label.className = "label";
+        label.textContent = pg.title || pg.url;
+        left.appendChild(label);
+        var type = document.createElement("div");
+        type.className = "type";
+        type.textContent = "unverified - not an official source";
+        left.appendChild(type);
+        row.appendChild(left);
+        var btn = document.createElement("button");
+        btn.textContent = "Open";
+        btn.onclick = function () { chrome.tabs.create({ url: pg.url }); };
+        row.appendChild(btn);
+        box.appendChild(row);
+      });
     }
 
     if (res.offsiteLinks && res.offsiteLinks.length) {
