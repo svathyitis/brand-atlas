@@ -1,0 +1,143 @@
+{
+  "version": "2026-11-09",
+  "note": "Starter directory. Every entry was verified by hand on 2026-11-09 against the company's own site. An entry only ever points to assets the company itself publishes.",
+  "companies": [
+    {
+      "name": "GitHub",
+      "domains": [
+        "github.com",
+        "brand.github.com",
+        "github.githubassets.com"
+      ],
+      "status": "official-assets",
+      "brandPage": "https://brand.github.com/foundations/logo",
+      "publishes": [
+        "Logo package (ZIP, includes SVG and PNG)",
+        "Usage guidance on the brand site"
+      ],
+      "assets": [
+        {
+          "label": "GitHub logo package (ZIP, includes SVGs)",
+          "url": "https://brand.github.com/GitHub_Logos.zip",
+          "type": "zip"
+        }
+      ],
+      "licenseNote": "Usage rules are on the Logos page itself; the logo should sit high in the hierarchy, unmodified."
+    },
+    {
+      "name": "Figma",
+      "domains": [
+        "figma.com"
+      ],
+      "status": "official-assets",
+      "brandPage": "https://www.figma.com/using-the-figma-brand/",
+      "publishes": [
+        "Logo package (ZIP)",
+        "Brand Book (PDF)",
+        "Trademark guidelines"
+      ],
+      "assets": [
+        {
+          "label": "Figma logos (ZIP, includes SVGs)",
+          "url": "https://cdn.sanity.io/files/599r6htc/regionalized/9200bce6d92988205ab756696d291c8adcf1ff5b.zip",
+          "type": "zip"
+        },
+        {
+          "label": "Figma Brand Book (PDF)",
+          "url": "https://static.figma.com/uploads/35bc6db4415269cfeace41c8c4637945a85732b2.pdf",
+          "type": "pdf"
+        }
+      ],
+      "licenseNote": "Downloading the logos means agreeing to Figma's trademark guidelines and Brand Book. Informational use and links to Figma are allowed."
+    },
+    {
+      "name": "Slack",
+      "domains": [
+        "slack.com"
+      ],
+      "status": "official-assets",
+      "brandPage": "https://slack.com/media-kit",
+      "publishes": [
+        "Logo files via the media kit",
+        "Full brand center (logos, color, typography)"
+      ],
+      "assets": [
+        {
+          "label": "Slack media kit",
+          "url": "https://slack.com/media-kit",
+          "type": "page"
+        },
+        {
+          "label": "Slack Brand Center",
+          "url": "https://brand.slackhq.com/",
+          "type": "page"
+        },
+        {
+          "label": "Slack brand terms",
+          "url": "https://slack.com/terms-of-service/slack-brand",
+          "type": "page"
+        }
+      ],
+      "licenseNote": "Slack offers its marks for use covered by its brand guidelines without a separate agreement; other uses need a support request."
+    },
+    {
+      "name": "Angular",
+      "domains": [
+        "angular.dev"
+      ],
+      "status": "official-assets",
+      "brandPage": "https://angular.dev/press-kit",
+      "publishes": [
+        "Logo graphics (CC BY 4.0)",
+        "Brand guidelines",
+        "Mascot assets"
+      ],
+      "assets": [
+        {
+          "label": "Angular press kit (downloads via Google Drive)",
+          "url": "https://angular.dev/press-kit",
+          "type": "page"
+        }
+      ],
+      "licenseNote": "Logo graphics on the press-kit page are provided under CC BY 4.0."
+    },
+    {
+      "name": "Apple",
+      "domains": [
+        "apple.com"
+      ],
+      "status": "guidelines-only",
+      "brandPage": "https://www.apple.com/legal/intellectual-property/guidelinesfor3rdparties.html",
+      "publishes": [
+        "Trademark use guidelines (no downloadable logo assets found on Apple's official pages, verified 9 Nov 2026)"
+      ],
+      "assets": [
+        {
+          "label": "Guidelines for Using Apple Trademarks and Copyrights",
+          "url": "https://www.apple.com/legal/intellectual-property/guidelinesfor3rdparties.html",
+          "type": "page"
+        }
+      ],
+      "licenseNote": "Apple's guidelines page offers rules, not assets: the Apple logo and other Apple graphic symbols may not be used without an express written trademark licence. We found no downloadable logo on Apple's official pages when verified on 9 Nov 2026."
+    },
+    {
+      "name": "Microsoft",
+      "domains": [
+        "microsoft.com"
+      ],
+      "status": "guidelines-only",
+      "brandPage": "https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks",
+      "publishes": [
+        "Trademark and Brand Guidelines (no downloadable logo assets found on Microsoft's official pages, verified 9 Nov 2026)"
+      ],
+      "assets": [
+        {
+          "label": "Microsoft Trademark and Brand Guidelines",
+          "url": "https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks",
+          "type": "page"
+        }
+      ],
+      "licenseNote": "Microsoft's guidelines state its logos, icons and designs require an express licence; wordmarks may be used truthfully for compatibility statements. We found no downloadable logo on Microsoft's official pages when verified on 9 Nov 2026; partner assets sit behind the partner portal."
+    }
+  ]
+}

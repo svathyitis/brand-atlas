@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brand Atlas</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+
+<header class="topbar">
+  <svg class="mark" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+    <circle cx="12" cy="12" r="10" fill="none" stroke="#1D1B16" stroke-width="2"/>
+    <path d="M12 5 L17 17 L12 14.4 L7 17 Z" fill="#1D1B16"/>
+  </svg>
+  <h1>Brand Atlas</h1>
+</header>
+
+<nav class="modes" role="tablist" aria-label="Mode">
+  <button id="tab-lookup" class="mode active" role="tab" aria-selected="true">Find official assets</button>
+  <button id="tab-create" class="mode" role="tab" aria-selected="false">Make your own kit</button>
+</nav>
+
+<!-- ============ LOOKUP MODE ============ -->
+<section id="mode-lookup" class="panel" role="tabpanel">
+  <div id="lookup-loading" class="muted">Checking the current page…</div>
+
+  <div id="lookup-result" hidden>
+    <div class="company-row">
+      <h2 id="co-name"></h2>
+      <span id="co-status" class="chip"></span>
+    </div>
+
+    <div id="co-official">
+      <a id="co-brandpage" class="source-link" href="#" target="_blank" rel="noopener"></a>
+      <ul id="co-publishes" class="plain-list"></ul>
+      <p id="co-license" class="license"></p>
+      <div id="co-assets" class="assets"></div>
+      <button id="btn-pack" class="primary">Download PDF pack with source links</button>
+    </div>
+
+    <details id="detected-box">
+      <summary>Detected on this page <span class="caveat">not verified as officially published</span></summary>
+      <div id="detected-list" class="assets"></div>
+    </details>
+  </div>
+
+  <div id="lookup-none" hidden>
+    <h2 id="none-host"></h2>
+    <p class="muted">This company isn't in the starter directory yet. The directory only lists official
+    sources verified by hand — it never guesses a brand page.</p>
+    <details id="detected-box-2">
+      <summary>Detected on this page <span class="caveat">not verified as officially published</span></summary>
+      <div id="detected-list-2" class="assets"></div>
+    </details>
+  </div>
+</section>
+
+<!-- ============ CREATE MODE ============ -->
+<section id="mode-create" class="panel" role="tabpanel" hidden>
+  <div id="brief-step">
+    <label class="field">
+      <span>Venture name</span>
+      <input id="in-name" type="text" placeholder="Orange" maxlength="60">
+    </label>
+    <label class="field">
+      <span>Describe it in your own words — what it is, and any look you like</span>
+      <textarea id="in-desc" rows="3" placeholder="A fruit delivery club. I like Apple's website."></textarea>
+    </label>
+    <button id="btn-interpret" class="primary">Show my direction options</button>
+    <p class="fineprint">Directions are composed on your device from small built-in lists of known styles, colours and subjects - original geometry, never a copy of a referenced brand's logo. Starting points for a designer, not finished AI artwork.</p>
+  </div>
+
+  <div id="interpret-step" hidden>
+    <h3>How I read your brief</h3>
+    <p id="interpretation" class="readback"></p>
+    <div id="unknown-refs" class="fineprint" hidden></div>
+
+    <h3>Colour directions</h3>
+    <div id="palette-list" class="cards"></div>
+
+    <h3>Logo directions <span class="caveat">original starting points</span></h3>
+    <div id="mark-list" class="cards marks"></div>
+
+    <button id="btn-kit" class="primary" disabled>Download brand-guidelines PDF</button>
+    <p class="fineprint">Pick one colour direction and one logo direction first.</p>
+    <button id="btn-rebrief" class="ghost">Edit my brief</button>
+  </div>
+</section>
+
+<footer class="foot">
+  <span>Official sources verified Nov 2026</span>
+  <span>No account · lookup lists and kit generation run on your device · downloading official assets opens the company's own link</span>
+</footer>
+
+<script src="../vendor/jspdf.umd.min.js"></script>
+<script src="../lib/brandgen.js"></script>
+<script src="../lib/pdfpack.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

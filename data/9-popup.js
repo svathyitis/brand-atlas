@@ -1,0 +1,327 @@
+/* Brand Atlas - popup logic. */
+(function () {
+  "use strict";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var jspdf = window.jspdf;
+
+  var state = {
+    tab: null,            // the tab the user is looking at (never the popup itself)
+    entry: null,          // directory entry or null
+    detected: [],         // on-page SVG detections
+    directory: null,
+    // create mode
+    palettes: null, brief: null, marks: null,
+    chosenPalette: null, chosenMark: null
+  };
+
+  function hostnameOf(url) {
+    try { return new URL(url).hostname.replace(/^www\./, ""); } catch (e) { return null; }
+  }
+
+  function findEntry(host) {
+    if (!host || !state.directory) return null;
+    var parts = host.split(".");
+    for (var i = 0; i < state.directory.companies.length; i++) {
+      var c = state.directory.companies[i];
+      for (var j = 0; j < c.domains.length; j++) {
+        var d = c.domains[j];
+        if (host === d) return c;
+        // subdomains of a listed domain match the company (developer.apple.com -> apple.com)
+        if (host.length > d.length && host.slice(-(d.length + 1)) === "." + d) return c;
+      }
+    }
+    return null;
+  }
+
+  // Pick the tab the user is actually viewing. The worker remembers the last
+  // web tab the user looked at; fall back to the active http(s) tab.
+  function resolveTargetTab(cb) {
+    function fallback() {
+      chrome.tabs.query({ currentWindow: true }, function (tabs) {
+        var candidate = null, active = null;
+        for (var i = 0; i < tabs.length; i++) {
+          var t = tabs[i];
+          if (t.url && t.url.indexOf("chrome-extension://") === 0) continue;
+          if (t.active) active = t;
+          if (/^https?:/.test(t.url || "")) candidate = candidate || t;
+          if (t.active && /^https?:/.test(t.url || "")) { candidate = t; break; }
+        }
+        cb(candidate || active || null);
+      });
+    }
+    try {
+      chrome.runtime.sendMessage({ type: "get-target-tab" }, function (res) {
+        if (chrome.runtime.lastError || !res || typeof res.tabId !== "number") return fallback();
+        chrome.tabs.get(res.tabId, function (tab) {
+          if (chrome.runtime.lastError || !tab) return fallback();
+          cb(tab);
+        });
+      });
+    } catch (e) { fallback(); }
+  }
+
+  // ---------- Lookup mode ----------
+
+  function renderAssetRow(asset, inDetected) {
+    var row = document.createElement("div");
+    row.className = "asset";
+    var left = document.createElement("div");
+    var label = document.createElement("div");
+    label.className = "label";
+    label.textContent = asset.label || asset.alt || asset.url || "SVG found in page";
+    left.appendChild(label);
+    var type = document.createElement("div");
+    type.className = "type";
+    type.textContent = inDetected ? "on this page · unverified" : (asset.type || "file");
+    left.appendChild(type);
+    row.appendChild(left);
+
+    var btn = document.createElement("button");
+    if (inDetected && asset.kind === "inline-svg") {
+      btn.textContent = "Save SVG";
+      btn.onclick = function () {
+        var blob = new Blob([asset.svg], { type: "image/svg+xml" });
+        var url = URL.createObjectURL(blob);
+        chrome.runtime.sendMessage({ type: "download-asset", url: url }, function () {});
+      };
+    } else {
+      btn.textContent = asset.type === "page" ? "Open" : "Download";
+      btn.onclick = function () {
+        if (asset.type === "page") chrome.tabs.create({ url: asset.url });
+        else chrome.runtime.sendMessage({ type: "download-asset", url: asset.url }, function () {});
+      };
+    }
+    row.appendChild(btn);
+    return row;
+  }
+
+  function renderDetected(listEl, box) {
+    listEl.textContent = "";
+    if (!state.detected.length) {
+      box.hidden = true;
+      return;
+    }
+    box.hidden = false;
+    state.detected.forEach(function (d) {
+      listEl.appendChild(renderAssetRow(d, true));
+    });
+  }
+
+  function renderLookup() {
+    $("lookup-loading").hidden = true;
+    var entry = state.entry;
+    if (!entry) {
+      $("lookup-none").hidden = false;
+      $("none-host").textContent = hostnameOf(state.tab && state.tab.url) || "This page";
+      renderDetected($("detected-list-2"), $("detected-box-2"));
+      return;
+    }
+    $("lookup-result").hidden = false;
+    $("co-name").textContent = entry.name;
+    var chip = $("co-status");
+    if (entry.status === "official-assets") {
+      chip.textContent = "Publishes official assets";
+      chip.className = "chip ok";
+    } else {
+      chip.textContent = "Guidelines only";
+      chip.className = "chip warn";
+    }
+    var link = $("co-brandpage");
+    link.href = entry.brandPage;
+    link.textContent = "Official source: " + entry.brandPage.replace(/^https?:\/\//, "");
+    var pub = $("co-publishes");
+    pub.textContent = "";
+    entry.publishes.forEach(function (p) {
+      var li = document.createElement("li");
+      li.textContent = p;
+      pub.appendChild(li);
+    });
+    $("co-license").textContent = entry.licenseNote;
+    var assets = $("co-assets");
+    assets.textContent = "";
+    entry.assets.forEach(function (a) { assets.appendChild(renderAssetRow(a, false)); });
+    renderDetected($("detected-list"), $("detected-box"));
+  }
+
+  function initLookup() {
+    resolveTargetTab(function (tab) {
+      state.tab = tab;
+      state.entry = findEntry(hostnameOf(tab && tab.url));
+      // On-page detection only runs on the tab the user opened the popup on.
+      if (tab && /^https?:/.test(tab.url || "")) {
+        chrome.scripting.executeScript(
+          { target: { tabId: tab.id }, files: ["content/detect.js"] },
+          function (res) {
+            if (!chrome.runtime.lastError && res && res[0] && res[0].result) {
+              state.detected = res[0].result.found || [];
+            }
+            renderLookup();
+          }
+        );
+      } else {
+        renderLookup();
+      }
+    });
+  }
+
+  $("btn-pack").addEventListener("click", function () {
+    var doc = PdfPack.lookupPack(jspdf, state.entry, state.detected, state.tab && state.tab.url);
+    doc.save("brand-atlas-" + state.entry.name.toLowerCase().replace(/\s+/g, "-") + ".pdf");
+  });
+
+  // ---------- Create mode ----------
+
+  function swatch(color) {
+    var d = document.createElement("div");
+    d.className = "swatch";
+    d.style.background = color;
+    var s = document.createElement("small");
+    s.textContent = color;
+    s.style.color = BrandGen.labelColorFor(color);
+    d.appendChild(s);
+    return d;
+  }
+
+  function renderInterpretation() {
+    var b = state.brief;
+    var parts = [];
+    if (b.references.length) {
+      b.references.forEach(function (r) {
+        parts.push('"' + r.name + '" is on my short list of known site styles: ' + r.traits.join("; ") + ". I will not copy their logo or artwork.");
+      });
+    }
+    if (b.hueSource) parts.push('"' + b.hueSource + '" is a word I know, and it points me to this colour family.');
+    if (b.subjects.length) parts.push('"' + b.subjects.join('", "') + '" gives me the subject for the logo concepts below.');
+    if (!parts.length) parts.push("Nothing in your brief matched my built-in lists, so the directions below start from neutral geometry.");
+    $("interpretation").textContent = parts.join(" ");
+    $("unknown-refs").hidden = false;
+    var boundary = "I work from small built-in lists of known site styles, colour words and subjects - I don't understand arbitrary brands, sites or styles.";
+    if (b.unknownRefs.length) {
+      boundary = "I don't know " + b.unknownRefs.join(", ") +
+        " - tell me what you like about it in plain words (for example: spacious, playful, dark) and I'll use that. " + boundary;
+    }
+    $("unknown-refs").textContent = boundary;
+  }
+
+  function renderPalettes() {
+    var list = $("palette-list");
+    list.textContent = "";
+    state.palettes.forEach(function (p, idx) {
+      var card = document.createElement("div");
+      card.className = "card";
+      var t = document.createElement("div");
+      t.className = "card-title";
+      t.textContent = p.name;
+      card.appendChild(t);
+      var sw = document.createElement("div");
+      sw.className = "swatches";
+      ["primary", "secondary", "accent", "ink", "paper"].forEach(function (k) {
+        sw.appendChild(swatch(p.colors[k]));
+      });
+      card.appendChild(sw);
+      card.onclick = function () {
+        state.chosenPalette = p;
+        Array.prototype.forEach.call(list.children, function (c) { c.classList.remove("selected"); });
+        card.classList.add("selected");
+        renderMarks();
+        maybeEnableKit();
+      };
+      list.appendChild(card);
+    });
+  }
+
+  function renderMarks() {
+    var list = $("mark-list");
+    list.textContent = "";
+    if (!state.chosenPalette) return;
+    state.marks = BrandGen.makeMarks($("in-name").value, $("in-desc").value, state.chosenPalette);
+    state.chosenMark = null;
+    state.marks.forEach(function (mk) {
+      var card = document.createElement("div");
+      card.className = "card mark-card";
+      var box = document.createElement("div");
+      box.className = "svgbox";
+      box.innerHTML = mk.svg;
+      card.appendChild(box);
+      var t = document.createElement("div");
+      t.className = "card-title";
+      t.textContent = mk.label;
+      card.appendChild(t);
+      card.onclick = function () {
+        state.chosenMark = mk;
+        Array.prototype.forEach.call(list.children, function (c) { c.classList.remove("selected"); });
+        card.classList.add("selected");
+        maybeEnableKit();
+      };
+      list.appendChild(card);
+    });
+  }
+
+  function maybeEnableKit() {
+    $("btn-kit").disabled = !(state.chosenPalette && state.chosenMark);
+  }
+
+  $("btn-interpret").addEventListener("click", function () {
+    var name = $("in-name").value.trim();
+    var desc = $("in-desc").value.trim();
+    if (!name) { $("in-name").focus(); return; }
+    var res = BrandGen.makePalettes(name, desc);
+    state.brief = res.brief;
+    state.palettes = res.palettes;
+    state.chosenPalette = null;
+    state.chosenMark = null;
+    renderInterpretation();
+    renderPalettes();
+    renderMarks();
+    $("brief-step").hidden = true;
+    $("interpret-step").hidden = false;
+    var firstPalette = document.querySelector("#palette-list .card");
+    if (firstPalette) firstPalette.click();
+  });
+
+  $("btn-rebrief").addEventListener("click", function () {
+    $("interpret-step").hidden = true;
+    $("brief-step").hidden = false;
+  });
+
+  $("btn-kit").addEventListener("click", function () {
+    var name = $("in-name").value.trim();
+    var desc = $("in-desc").value.trim();
+    var fonts = BrandGen.fontsFor(desc || name);
+    PdfPack.kitPack(jspdf, {
+      name: name,
+      description: desc,
+      brief: state.brief,
+      palette: state.chosenPalette,
+      mark: state.chosenMark,
+      fonts: fonts
+    }, function (doc) {
+      doc.save("brand-atlas-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-starter-kit.pdf");
+    });
+  });
+
+  // ---------- Mode switching ----------
+
+  $("tab-lookup").addEventListener("click", function () {
+    $("tab-lookup").classList.add("active");
+    $("tab-create").classList.remove("active");
+    $("mode-lookup").hidden = false;
+    $("mode-create").hidden = true;
+  });
+  $("tab-create").addEventListener("click", function () {
+    $("tab-create").classList.add("active");
+    $("tab-lookup").classList.remove("active");
+    $("mode-create").hidden = false;
+    $("mode-lookup").hidden = true;
+  });
+
+  // ---------- Boot ----------
+
+  fetch("../data/directory.json")
+    .then(function (r) { return r.json(); })
+    .then(function (dir) {
+      state.directory = dir;
+      initLookup();
+    });
+})();
