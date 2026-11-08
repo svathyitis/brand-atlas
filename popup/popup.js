@@ -249,6 +249,8 @@
         state.keptPalette = kept ? null : p;
         if (state.keptPalette) state.chosenPalette = p;
         renderPalettes();
+        renderMarks();
+        maybeEnableKit();
       }));
       card.onclick = function () {
         state.chosenPalette = p;
