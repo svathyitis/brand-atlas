@@ -132,3 +132,22 @@ h3 { font-size: 13.5px; margin: 16px 0 8px; }
   display: flex; flex-direction: column; gap: 2px;
   font-size: 10.5px; color: var(--muted);
 }
+
+/* v0.2.0 - scan + refresh */
+.refresh-row { display: flex; align-items: center; gap: 10px; margin: 14px 0 6px; }
+.refresh-row .fineprint { margin: 0; }
+.card { position: relative; }
+.keep-toggle {
+  position: absolute; top: 6px; right: 6px;
+  font-size: 11px; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid #b9b2a4; background: #fff; color: #6b6455; cursor: pointer;
+}
+.keep-toggle[aria-pressed="true"] { background: #1D1B16; color: #fff; border-color: #1D1B16; }
+.card.kept { outline: 2px solid #1D1B16; }
+.scan-page { border: 1px solid #e4ded2; border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
+.scan-page h3 { margin: 0 0 4px; font-size: 14px; }
+.scan-page .via { color: #6b6455; font-size: 11px; }
+.scan-note { color: #6b6455; font-size: 12px; margin: 8px 0; }
+.scan-empty { color: #6b6455; font-size: 13px; }
+#scan-status { margin-top: 10px; }
+#btn-scan { margin-top: 6px; }
