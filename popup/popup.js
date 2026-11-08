@@ -12,7 +12,10 @@
     directory: null,
     // create mode
     palettes: null, brief: null, marks: null,
-    chosenPalette: null, chosenMark: null
+    chosenPalette: null, chosenMark: null,
+    variant: 0,            // refresh round: 0 = first suggestions
+    keptPalette: null, keptMark: null,   // pinned with Keep
+    scanning: false
   };
 
   function hostnameOf(url) {
@@ -204,12 +207,34 @@
     $("unknown-refs").textContent = boundary;
   }
 
+  function paletteKey(p) { return p.name + "|" + JSON.stringify(p.colors); }
+
+  function makeKeepToggle(isKept, onToggle) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "keep-toggle";
+    b.setAttribute("aria-pressed", isKept ? "true" : "false");
+    b.textContent = isKept ? "Kept" : "Keep";
+    b.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      onToggle();
+    });
+    return b;
+  }
+
   function renderPalettes() {
     var list = $("palette-list");
     list.textContent = "";
-    state.palettes.forEach(function (p, idx) {
+    var all = [];
+    if (state.keptPalette &&
+        !state.palettes.some(function (p) { return paletteKey(p) === paletteKey(state.keptPalette); })) {
+      all.push(state.keptPalette);   // pinned palette stays visible across refreshes
+    }
+    all = all.concat(state.palettes);
+    all.forEach(function (p) {
+      var kept = state.keptPalette && paletteKey(p) === paletteKey(state.keptPalette);
       var card = document.createElement("div");
-      card.className = "card";
+      card.className = "card" + (kept ? " kept" : "");
       var t = document.createElement("div");
       t.className = "card-title";
       t.textContent = p.name;
@@ -220,6 +245,11 @@
         sw.appendChild(swatch(p.colors[k]));
       });
       card.appendChild(sw);
+      card.appendChild(makeKeepToggle(kept, function () {
+        state.keptPalette = kept ? null : p;
+        if (state.keptPalette) state.chosenPalette = p;
+        renderPalettes();
+      }));
       card.onclick = function () {
         state.chosenPalette = p;
         Array.prototype.forEach.call(list.children, function (c) { c.classList.remove("selected"); });
@@ -227,6 +257,9 @@
         renderMarks();
         maybeEnableKit();
       };
+      if (state.chosenPalette && paletteKey(p) === paletteKey(state.chosenPalette)) {
+        card.classList.add("selected");
+      }
       list.appendChild(card);
     });
   }
@@ -235,11 +268,23 @@
     var list = $("mark-list");
     list.textContent = "";
     if (!state.chosenPalette) return;
-    state.marks = BrandGen.makeMarks($("in-name").value, $("in-desc").value, state.chosenPalette);
-    state.chosenMark = null;
+    var name = $("in-name").value, desc = $("in-desc").value;
+    state.marks = BrandGen.makeMarks(name, desc, state.chosenPalette, state.variant);
+    // A pinned logo stays pinned across refreshes, redrawn in the current palette.
+    if (state.keptMark) {
+      var redrawn = BrandGen.drawMarkById(state.keptMark.id, name, state.chosenPalette);
+      if (redrawn) {
+        state.keptMark = redrawn;
+        if (!state.marks.some(function (m) { return m.id === redrawn.id; })) {
+          state.marks.unshift(redrawn);
+        }
+      }
+    }
+    var stillThere = false;
     state.marks.forEach(function (mk) {
+      var kept = state.keptMark && mk.id === state.keptMark.id;
       var card = document.createElement("div");
-      card.className = "card mark-card";
+      card.className = "card mark-card" + (kept ? " kept" : "");
       var box = document.createElement("div");
       box.className = "svgbox";
       box.innerHTML = mk.svg;
@@ -248,14 +293,26 @@
       t.className = "card-title";
       t.textContent = mk.label;
       card.appendChild(t);
+      card.appendChild(makeKeepToggle(kept, function () {
+        state.keptMark = kept ? null : mk;
+        if (state.keptMark) state.chosenMark = mk;
+        renderMarks();
+        maybeEnableKit();
+      }));
       card.onclick = function () {
         state.chosenMark = mk;
         Array.prototype.forEach.call(list.children, function (c) { c.classList.remove("selected"); });
         card.classList.add("selected");
         maybeEnableKit();
       };
+      if (state.chosenMark && mk.id === state.chosenMark.id) {
+        card.classList.add("selected");
+        stillThere = true;
+      }
       list.appendChild(card);
     });
+    if (!stillThere) state.chosenMark = state.keptMark || null;
+    maybeEnableKit();
   }
 
   function maybeEnableKit() {
@@ -266,9 +323,12 @@
     var name = $("in-name").value.trim();
     var desc = $("in-desc").value.trim();
     if (!name) { $("in-name").focus(); return; }
-    var res = BrandGen.makePalettes(name, desc);
+    var res = BrandGen.makePalettes(name, desc, 0);
     state.brief = res.brief;
     state.palettes = res.palettes;
+    state.variant = 0;
+    state.keptPalette = null;
+    state.keptMark = null;
     state.chosenPalette = null;
     state.chosenMark = null;
     renderInterpretation();
@@ -285,10 +345,29 @@
     $("brief-step").hidden = false;
   });
 
+  $("btn-refresh").addEventListener("click", function () {
+    var name = $("in-name").value.trim();
+    var desc = $("in-desc").value.trim();
+    state.variant++;
+    var res = BrandGen.makePalettes(name, desc, state.variant);
+    state.palettes = res.palettes;
+    state.chosenPalette = state.keptPalette || null;
+    if (!state.keptMark) state.chosenMark = null;
+    renderPalettes();
+    // reselect the kept palette card if there is one, else clear marks
+    if (state.chosenPalette) {
+      renderMarks();
+    } else {
+      state.marks = null;
+      $("mark-list").textContent = "";
+      maybeEnableKit();
+    }
+  });
+
   $("btn-kit").addEventListener("click", function () {
     var name = $("in-name").value.trim();
     var desc = $("in-desc").value.trim();
-    var fonts = BrandGen.fontsFor(desc || name);
+    var fonts = BrandGen.fontsFor(desc || name, state.variant);
     PdfPack.kitPack(jspdf, {
       name: name,
       description: desc,
@@ -299,6 +378,165 @@
     }, function (doc) {
       doc.save("brand-atlas-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-starter-kit.pdf");
     });
+  });
+
+  // ---------- Site scan (lookup mode, directory miss) ----------
+
+  function renderScan(res) {
+    $("scan-status").hidden = true;
+    var box = $("scan-results");
+    box.hidden = false;
+    box.textContent = "";
+    var summary = document.createElement("p");
+    summary.className = "scan-note";
+    var parts = [];
+    if (res.checkedPaths.length) parts.push(res.checkedPaths.length + " common paths");
+    if (res.stats.linkPagesFetched) parts.push(res.stats.linkPagesFetched + " links from this page");
+    summary.textContent = "Checked " + (parts.join(" and ") || "this page") + " on " + res.host +
+      " (" + res.stats.requests + " requests to the site).";
+    box.appendChild(summary);
+
+    if (res.shellPaths && res.shellPaths.length) {
+      var sh = document.createElement("p");
+      sh.className = "scan-note";
+      sh.textContent = "This site answers at " + res.shellPaths.length + " checked paths (" +
+        res.shellPaths.slice(0, 4).join(", ") + (res.shellPaths.length > 4 ? ", …" : "") +
+        ") with the same generic page - its router serves one page for every address, so these are not distinct official pages.";
+      box.appendChild(sh);
+    }
+
+    if (!res.pages.length) {
+      var none = document.createElement("p");
+      none.className = "scan-empty";
+      none.textContent = "No distinct official brand or press page answered on the checked paths and links. " +
+        "That only means this scan did not find one - it does not prove the company publishes none.";
+      if (!(res.offsiteLinks && res.offsiteLinks.length)) {
+        box.appendChild(none);
+        return;
+      }
+      box.appendChild(none);
+    }
+
+    if (res.offsiteLinks && res.offsiteLinks.length) {
+      var off = document.createElement("p");
+      off.className = "scan-note";
+      off.textContent = "This page also links to official-looking pages on related sites - these can't be scanned from here, open to check:";
+      box.appendChild(off);
+      res.offsiteLinks.forEach(function (o) {
+        var row = document.createElement("div");
+        row.className = "asset";
+        var left = document.createElement("div");
+        var label = document.createElement("div");
+        label.className = "label";
+        label.textContent = o.text || o.url;
+        left.appendChild(label);
+        var type = document.createElement("div");
+        type.className = "type";
+        try {
+          type.textContent = o.from
+            ? "linked from the official page, on " + new URL(o.url).hostname
+            : "related company site: " + new URL(o.url).hostname;
+        } catch (e) { type.textContent = "related company site"; }
+        left.appendChild(type);
+        row.appendChild(left);
+        var btn = document.createElement("button");
+        btn.textContent = "Open";
+        btn.onclick = function () { chrome.tabs.create({ url: o.url }); };
+        row.appendChild(btn);
+        box.appendChild(row);
+      });
+    }
+
+    res.pages.forEach(function (pg) {
+      var card = document.createElement("div");
+      card.className = "scan-page";
+      var h = document.createElement("h3");
+      h.textContent = pg.title || pg.url;
+      card.appendChild(h);
+      var via = document.createElement("div");
+      via.className = "via";
+      var viaText = pg.via.indexOf("path:") === 0
+        ? "found at " + pg.via.slice(5)
+        : "found through a page link" + (pg.via.indexOf("link:") === 0 && pg.via.slice(5) ? ' ("' + pg.via.slice(5) + '")' : "");
+      via.textContent = viaText;
+      card.appendChild(via);
+      var open = document.createElement("a");
+      open.href = pg.url;
+      open.target = "_blank";
+      open.rel = "noopener";
+      open.className = "source-link";
+      open.textContent = "Open official page";
+      card.appendChild(open);
+
+      if (pg.assets.length) {
+        var assets = document.createElement("div");
+        assets.className = "assets";
+        pg.assets.forEach(function (a) {
+          var row = document.createElement("div");
+          row.className = "asset";
+          var left = document.createElement("div");
+          var label = document.createElement("div");
+          label.className = "label";
+          label.textContent = a.label;
+          left.appendChild(label);
+          var type = document.createElement("div");
+          type.className = "type";
+          type.textContent = a.onSite
+            ? "download linked from the official page"
+            : "linked from the official page, hosted on " + a.host;
+          left.appendChild(type);
+          row.appendChild(left);
+          var btn = document.createElement("button");
+          btn.textContent = a.onSite ? "Download" : "Open";
+          btn.onclick = function () {
+            if (a.onSite) chrome.runtime.sendMessage({ type: "download-asset", url: a.url }, function () {});
+            else chrome.tabs.create({ url: a.url });
+          };
+          row.appendChild(btn);
+          assets.appendChild(row);
+        });
+        card.appendChild(assets);
+      } else {
+        var note = document.createElement("p");
+        note.className = "scan-empty";
+        if (pg.shell) {
+          note.textContent = "This page is built by JavaScript in the browser, so the scan couldn't read its content - open it to check for brand material.";
+        } else {
+          note.textContent = "No downloadable kit or guidelines found on this page." +
+            (pg.hasGuidelineText ? " It does contain brand-usage text - open it to read the terms." : "");
+        }
+        card.appendChild(note);
+      }
+      box.appendChild(card);
+    });
+  }
+
+  $("btn-scan").addEventListener("click", function () {
+    var tab = state.tab;
+    var status = $("scan-status");
+    if (!tab || !/^https?:/.test(tab.url || "")) {
+      status.hidden = false;
+      status.textContent = "Open a normal website tab first - browser pages can't be scanned.";
+      return;
+    }
+    if (state.scanning) return;
+    state.scanning = true;
+    $("btn-scan").disabled = true;
+    $("scan-results").hidden = true;
+    status.hidden = false;
+    status.textContent = "Scanning " + (hostnameOf(tab.url) || "this site") + " - links on this page plus 16 common paths…";
+    chrome.scripting.executeScript(
+      { target: { tabId: tab.id }, files: ["content/discover.js"] },
+      function (res) {
+        state.scanning = false;
+        $("btn-scan").disabled = false;
+        if (chrome.runtime.lastError || !res || !res[0] || !res[0].result) {
+          status.textContent = "This page wouldn't let the scan run (some browser and store pages block it). Try a normal page on the site.";
+          return;
+        }
+        renderScan(res[0].result);
+      }
+    );
   });
 
   // ---------- Mode switching ----------
