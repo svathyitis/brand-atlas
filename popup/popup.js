@@ -423,7 +423,8 @@
       none.className = "scan-empty";
       none.textContent = "No distinct official brand or press page answered on the checked paths and links. " +
         "That only means this scan did not find one - it does not prove the company publishes none.";
-      if (!(res.offsiteLinks && res.offsiteLinks.length)) {
+      if (!(res.offsiteLinks && res.offsiteLinks.length) &&
+          !(res.unverifiedPages && res.unverifiedPages.length)) {
         box.appendChild(none);
         return;
       }
@@ -433,7 +434,7 @@
     if (res.unverifiedPages && res.unverifiedPages.length) {
       var uh = document.createElement("p");
       uh.className = "scan-note";
-      uh.textContent = "Unverified - these addresses answered but belong to user or community spaces on this site, not to the company's own newsroom:";
+      uh.textContent = "Unverified - these addresses answered, but this site also hosts user and community pages and we could not confirm these as the company's own official pages:";
       box.appendChild(uh);
       res.unverifiedPages.forEach(function (pg) {
         var row = document.createElement("div");
@@ -445,7 +446,7 @@
         left.appendChild(label);
         var type = document.createElement("div");
         type.className = "type";
-        type.textContent = "unverified - not an official source";
+        type.textContent = "unverified - not confirmed as an official source";
         left.appendChild(type);
         row.appendChild(left);
         var btn = document.createElement("button");
