@@ -41,25 +41,21 @@
     try { return new URL(u).origin === ORIGIN; } catch (e) { return false; }
   }
   // Multi-tenant / user-content hosts: on these, a bare path usually belongs
-  // to a user or community space, NOT to the company. A page found there is
-  // only official when it sits under that host's own organizational routes;
-  // anything else is reported separately as unverified, never as official.
+  // to a user or community space, NOT to the company. No path allowlist makes
+  // a page official here - official on these hosts requires grounded evidence:
+  // a link from the host's own start page whose anchor names an official
+  // function (press, brand, media, newsroom, about, guidelines, logo, style
+  // guide). Everything else found on these hosts - probed paths, redirects,
+  // unknown tenant routes - is reported separately as unverified, never
+  // official. Ordinary company domains use their own origin as the lead.
   var UGC_HOSTS = {
-    "github.com": [/^\/about(\/|$)/, /^\/org(\/|$)/, /^\/topics(\/|$)/],
-    "gitlab.com": [/^\/about(\/|$)/],
-    "bitbucket.org": [/^\/product(\/|$)/, /^\/company(\/|$)/],
-    "medium.com": [/^\/about(\/|$)/],
-    "linkedin.com": [/^\/company(\/|$)/],
-    "notion.site": [],
-    "tumblr.com": []
+    "github.com": true, "gitlab.com": true, "bitbucket.org": true,
+    "medium.com": true, "linkedin.com": true, "notion.site": true, "tumblr.com": true
   };
-  function ugcRouteKind(u) {
+  var OFFICIAL_ANCHOR_RE = /(press|brand|media[\s-]?kit|newsroom|about|guideline|logo|style[\s-]?guide)/i;
+  function isUgcHost(u) {
     var h = hostOf(u).replace(/^www\./, "");
-    var rules = UGC_HOSTS[h];
-    if (!rules) return null;              // not a known UGC host
-    var p = pathOf(u);
-    for (var i = 0; i < rules.length; i++) if (rules[i].test(p === "/" ? p : p + "/")) return "official";
-    return "user";                        // everything else: user/community space
+    return !!UGC_HOSTS[h];
   }
 
   // Rough registrable-domain match (last two labels). Good enough to spot a
@@ -134,7 +130,7 @@
       if (pathOf(finalUrl) !== pathOf(u) && !PAGE_RE.test(pathOf(finalUrl))) return null;
       var html = await r.text();
       if (html.length > MAX_HTML) html = html.slice(0, MAX_HTML);
-      return { url: finalUrl, requested: u, via: via, html: html, htmlLen: html.length, redirected: pathOf(finalUrl) !== pathOf(u), route: ugcRouteKind(finalUrl) };
+      return { url: finalUrl, requested: u, via: via, html: html, htmlLen: html.length, redirected: pathOf(finalUrl) !== pathOf(u), ugc: isUgcHost(finalUrl) };
     } catch (e) {
       return null;   // network/CORS refusal - just means this scan can't read it
     }
@@ -234,11 +230,11 @@
   }
 
   // ---------- Phase 4: analyse ----------
-  var pagesRoute = {};
+  var pagesUgc = {};
   for (var pr = 0; pr < pages.length; pr++) {
-    if (pages[pr].route) {
-      pagesRoute[strip(pages[pr].requested)] = pages[pr].route;
-      pagesRoute[strip(pages[pr].url)] = pages[pr].route;
+    if (pages[pr].ugc) {
+      pagesUgc[strip(pages[pr].requested)] = true;
+      pagesUgc[strip(pages[pr].url)] = true;
     }
   }
   var analysed = [];
@@ -273,9 +269,15 @@
       shellPaths.push(pg2.via.slice(5));
       continue;
     }
-    var route = pagesRoute[strip(pg2.requested)] || pagesRoute[strip(pg2.url)] || null;
+    var onUgc = !!(pagesUgc[strip(pg2.requested)] || pagesUgc[strip(pg2.url)]);
     delete pg2.htmlLen;
-    if (route === "user") { unverified.push(pg2); continue; }
+    if (onUgc) {
+      // Multi-tenant host: official only with link evidence from the host's
+      // own start page naming an official function; otherwise unverified.
+      var lm = /^link:(.*)$/.exec(pg2.via || "");
+      if (lm && OFFICIAL_ANCHOR_RE.test(lm[1])) { results.push(pg2); continue; }
+      unverified.push(pg2); continue;
+    }
     results.push(pg2);
   }
 
